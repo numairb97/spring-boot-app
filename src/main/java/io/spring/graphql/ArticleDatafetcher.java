@@ -26,11 +26,12 @@ import io.spring.graphql.DgsConstants.QUERY;
 import io.spring.graphql.types.Article;
 import io.spring.graphql.types.ArticleEdge;
 import io.spring.graphql.types.ArticlesConnection;
+import io.spring.graphql.types.PageInfo;
 import io.spring.graphql.types.Profile;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
-import org.joda.time.format.ISODateTimeFormat;
 
 @DgsComponent
 @AllArgsConstructor
@@ -64,7 +65,8 @@ public class ArticleDatafetcher {
               current,
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    graphql.relay.PageInfo relayPageInfo = buildArticlePageInfo(articles);
+    io.spring.graphql.types.PageInfo pageInfo = convertPageInfo(relayPageInfo);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -114,7 +116,8 @@ public class ArticleDatafetcher {
               target,
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV));
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    graphql.relay.PageInfo relayPageInfo = buildArticlePageInfo(articles);
+    io.spring.graphql.types.PageInfo pageInfo = convertPageInfo(relayPageInfo);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -167,7 +170,8 @@ public class ArticleDatafetcher {
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
               current);
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    graphql.relay.PageInfo relayPageInfo = buildArticlePageInfo(articles);
+    io.spring.graphql.types.PageInfo pageInfo = convertPageInfo(relayPageInfo);
 
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
@@ -221,7 +225,8 @@ public class ArticleDatafetcher {
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
               current);
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    graphql.relay.PageInfo relayPageInfo = buildArticlePageInfo(articles);
+    io.spring.graphql.types.PageInfo pageInfo = convertPageInfo(relayPageInfo);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -276,7 +281,8 @@ public class ArticleDatafetcher {
               new CursorPageParameter<>(DateTimeCursor.parse(before), last, Direction.PREV),
               current);
     }
-    graphql.relay.PageInfo pageInfo = buildArticlePageInfo(articles);
+    graphql.relay.PageInfo relayPageInfo = buildArticlePageInfo(articles);
+    io.spring.graphql.types.PageInfo pageInfo = convertPageInfo(relayPageInfo);
     ArticlesConnection articlesConnection =
         ArticlesConnection.newBuilder()
             .pageInfo(pageInfo)
@@ -368,17 +374,30 @@ public class ArticleDatafetcher {
         articles.hasNext());
   }
 
+  private PageInfo convertPageInfo(graphql.relay.PageInfo relayPageInfo) {
+    return PageInfo.newBuilder()
+        .hasNextPage(relayPageInfo.isHasNextPage())
+        .hasPreviousPage(relayPageInfo.isHasPreviousPage())
+        .startCursor(
+            relayPageInfo.getStartCursor() != null
+                ? relayPageInfo.getStartCursor().getValue()
+                : null)
+        .endCursor(
+            relayPageInfo.getEndCursor() != null ? relayPageInfo.getEndCursor().getValue() : null)
+        .build();
+  }
+
   private Article buildArticleResult(ArticleData articleData) {
     return Article.newBuilder()
         .body(articleData.getBody())
-        .createdAt(ISODateTimeFormat.dateTime().withZoneUTC().print(articleData.getCreatedAt()))
+        .createdAt(DateTimeFormatter.ISO_INSTANT.format(articleData.getCreatedAt()))
         .description(articleData.getDescription())
         .favorited(articleData.isFavorited())
         .favoritesCount(articleData.getFavoritesCount())
         .slug(articleData.getSlug())
         .tagList(articleData.getTagList())
         .title(articleData.getTitle())
-        .updatedAt(ISODateTimeFormat.dateTime().withZoneUTC().print(articleData.getUpdatedAt()))
+        .updatedAt(DateTimeFormatter.ISO_INSTANT.format(articleData.getUpdatedAt()))
         .build();
   }
 }
