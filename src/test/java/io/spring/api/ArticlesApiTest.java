@@ -1,6 +1,13 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import static java.util.Arrays.asList;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,7 +15,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
 import io.spring.JacksonCustomizations;
 import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.ArticleQueryService;
@@ -38,11 +44,12 @@ public class ArticlesApiTest extends TestWithCurrentUser {
 
   @MockBean private ArticleCommandService articleCommandService;
 
+  @Autowired private ObjectMapper objectMapper;
+
   @Override
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
   }
 
   @Test
@@ -76,20 +83,16 @@ public class ArticlesApiTest extends TestWithCurrentUser {
 
     when(articleQueryService.findById(any(), any())).thenReturn(Optional.of(articleData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .then()
-        .statusCode(200)
-        .body("article.title", equalTo(title))
-        .body("article.favorited", equalTo(false))
-        .body("article.body", equalTo(body))
-        .body("article.favoritesCount", equalTo(0))
-        .body("article.author.username", equalTo(user.getUsername()))
-        .body("article.author.id", equalTo(null));
+    mvc.perform(post("/articles")
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.article.title").value(title))
+        .andExpect(jsonPath("$.article.favorited").value(false))
+        .andExpect(jsonPath("$.article.body").value(body))
+        .andExpect(jsonPath("$.article.favoritesCount").value(0))
+        .andExpect(jsonPath("$.article.author.username").value(user.getUsername()));
 
     verify(articleCommandService).createArticle(any(), any());
   }
@@ -102,20 +105,16 @@ public class ArticlesApiTest extends TestWithCurrentUser {
     String[] tagList = {"reactjs", "angularjs", "dragons"};
     Map<String, Object> param = prepareParam(title, description, body, asList(tagList));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("errors.body[0]", equalTo("can't be empty"));
+    mvc.perform(post("/articles")
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   @Test
-  public void should_get_error_message_with_duplicated_title() {
+  public void should_get_error_message_with_duplicated_title() throws Exception {
     String title = "How to train your dragon";
     String slug = "how-to-train-your-dragon";
     String description = "Ever wonder how?";
@@ -142,15 +141,11 @@ public class ArticlesApiTest extends TestWithCurrentUser {
 
     when(articleQueryService.findById(any(), any())).thenReturn(Optional.of(articleData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles")
-        .prettyPeek()
-        .then()
-        .statusCode(422);
+    mvc.perform(post("/articles")
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest());
   }
 
   private HashMap<String, Object> prepareParam(

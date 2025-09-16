@@ -1,13 +1,18 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.spring.JacksonCustomizations;
 import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.ArticleQueryService;
@@ -46,7 +51,6 @@ public class ArticleFavoriteApiTest extends TestWithCurrentUser {
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
     User anotherUser = new User("other@test.com", "other", "123", "", "");
     article = new Article("title", "desc", "body", Arrays.asList("java"), anotherUser.getId());
     when(articleRepository.findBySlug(eq(article.getSlug()))).thenReturn(Optional.of(article));
@@ -74,14 +78,10 @@ public class ArticleFavoriteApiTest extends TestWithCurrentUser {
 
   @Test
   public void should_favorite_an_article_success() throws Exception {
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .post("/articles/{slug}/favorite", article.getSlug())
-        .prettyPeek()
-        .then()
-        .statusCode(200)
-        .body("article.id", equalTo(article.getId()));
+    mvc.perform(post("/articles/{slug}/favorite", article.getSlug())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.article.id").value(article.getId()));
 
     verify(articleFavoriteRepository).save(any());
   }
@@ -90,14 +90,10 @@ public class ArticleFavoriteApiTest extends TestWithCurrentUser {
   public void should_unfavorite_an_article_success() throws Exception {
     when(articleFavoriteRepository.find(eq(article.getId()), eq(user.getId())))
         .thenReturn(Optional.of(new ArticleFavorite(article.getId(), user.getId())));
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/articles/{slug}/favorite", article.getSlug())
-        .prettyPeek()
-        .then()
-        .statusCode(200)
-        .body("article.id", equalTo(article.getId()));
+    mvc.perform(delete("/articles/{slug}/favorite", article.getSlug())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.article.id").value(article.getId()));
     verify(articleFavoriteRepository).remove(new ArticleFavorite(article.getId(), user.getId()));
   }
 }
