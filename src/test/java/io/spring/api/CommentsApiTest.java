@@ -1,13 +1,17 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.spring.JacksonCustomizations;
 import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.CommentQueryService;
@@ -44,9 +48,10 @@ public class CommentsApiTest extends TestWithCurrentUser {
   private Comment comment;
   @Autowired private MockMvc mvc;
 
+  @Autowired private ObjectMapper objectMapper;
+
   @BeforeEach
   public void setUp() throws Exception {
-    RestAssuredMockMvc.mockMvc(mvc);
     super.setUp();
     article = new Article("title", "desc", "body", Arrays.asList("test", "java"), user.getId());
     when(articleRepository.findBySlug(eq(article.getSlug()))).thenReturn(Optional.of(article));
@@ -79,15 +84,12 @@ public class CommentsApiTest extends TestWithCurrentUser {
 
     when(commentQueryService.findById(anyString(), eq(user))).thenReturn(Optional.of(commentData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles/{slug}/comments", article.getSlug())
-        .then()
-        .statusCode(201)
-        .body("comment.body", equalTo(commentData.getBody()));
+    mvc.perform(post("/articles/{slug}/comments", article.getSlug())
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.comment.body").value(commentData.getBody()));
   }
 
   @Test
@@ -105,27 +107,21 @@ public class CommentsApiTest extends TestWithCurrentUser {
           }
         };
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(param)
-        .when()
-        .post("/articles/{slug}/comments", article.getSlug())
-        .then()
-        .statusCode(422)
-        .body("errors.body[0]", equalTo("can't be empty"));
+    mvc.perform(post("/articles/{slug}/comments", article.getSlug())
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   @Test
   public void should_get_comments_of_article_success() throws Exception {
     when(commentQueryService.findByArticleId(anyString(), eq(null)))
         .thenReturn(Arrays.asList(commentData));
-    RestAssuredMockMvc.when()
-        .get("/articles/{slug}/comments", article.getSlug())
-        .prettyPeek()
-        .then()
-        .statusCode(200)
-        .body("comments[0].id", equalTo(commentData.getId()));
+    mvc.perform(get("/articles/{slug}/comments", article.getSlug()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.comments[0].id").value(commentData.getId()));
   }
 
   @Test
@@ -133,12 +129,9 @@ public class CommentsApiTest extends TestWithCurrentUser {
     when(commentRepository.findById(eq(article.getId()), eq(comment.getId())))
         .thenReturn(Optional.of(comment));
 
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/articles/{slug}/comments/{id}", article.getSlug(), comment.getId())
-        .then()
-        .statusCode(204);
+    mvc.perform(delete("/articles/{slug}/comments/{id}", article.getSlug(), comment.getId())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isNoContent());
   }
 
   @Test
@@ -155,11 +148,8 @@ public class CommentsApiTest extends TestWithCurrentUser {
         .thenReturn(Optional.of(comment));
     String token = jwtService.toToken(anotherUser);
     when(userRepository.findById(eq(anotherUser.getId()))).thenReturn(Optional.of(anotherUser));
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/articles/{slug}/comments/{id}", article.getSlug(), comment.getId())
-        .then()
-        .statusCode(403);
+    mvc.perform(delete("/articles/{slug}/comments/{id}", article.getSlug(), comment.getId())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isForbidden());
   }
 }

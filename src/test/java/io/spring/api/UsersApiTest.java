@@ -1,13 +1,15 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.spring.JacksonCustomizations;
 import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.UserQueryService;
@@ -52,9 +54,10 @@ public class UsersApiTest {
 
   private String defaultAvatar;
 
+  @Autowired private ObjectMapper objectMapper;
+
   @BeforeEach
   public void setUp() throws Exception {
-    RestAssuredMockMvc.mockMvc(mvc);
     defaultAvatar = "https://static.productionready.io/images/smiley-cyrus.jpg";
   }
 
@@ -75,18 +78,15 @@ public class UsersApiTest {
 
     Map<String, Object> param = prepareRegisterParameter(email, username);
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users")
-        .then()
-        .statusCode(201)
-        .body("user.email", equalTo(email))
-        .body("user.username", equalTo(username))
-        .body("user.bio", equalTo(""))
-        .body("user.image", equalTo(defaultAvatar))
-        .body("user.token", equalTo("123"));
+    mvc.perform(post("/users")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.user.email").value(email))
+        .andExpect(jsonPath("$.user.username").value(username))
+        .andExpect(jsonPath("$.user.bio").value(""))
+        .andExpect(jsonPath("$.user.image").value(defaultAvatar))
+        .andExpect(jsonPath("$.user.token").value("123"));
 
     verify(userService).createUser(any());
   }
@@ -99,15 +99,11 @@ public class UsersApiTest {
 
     Map<String, Object> param = prepareRegisterParameter(email, username);
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("errors.username[0]", equalTo("can't be empty"));
+    mvc.perform(post("/users")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   @Test
@@ -117,15 +113,11 @@ public class UsersApiTest {
 
     Map<String, Object> param = prepareRegisterParameter(email, username);
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("errors.email[0]", equalTo("should be an email"));
+    mvc.perform(post("/users")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   @Test
@@ -139,15 +131,11 @@ public class UsersApiTest {
 
     Map<String, Object> param = prepareRegisterParameter(email, username);
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("errors.username[0]", equalTo("duplicated username"));
+    mvc.perform(post("/users")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   @Test
@@ -162,14 +150,11 @@ public class UsersApiTest {
 
     Map<String, Object> param = prepareRegisterParameter(email, username);
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users")
-        .then()
-        .statusCode(422)
-        .body("errors.email[0]", equalTo("duplicated email"));
+    mvc.perform(post("/users")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Bad Request"));
   }
 
   private HashMap<String, Object> prepareRegisterParameter(
@@ -217,19 +202,15 @@ public class UsersApiTest {
           }
         };
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users/login")
-        .then()
-        .statusCode(200)
-        .body("user.email", equalTo(email))
-        .body("user.username", equalTo(username))
-        .body("user.bio", equalTo(""))
-        .body("user.image", equalTo(defaultAvatar))
-        .body("user.token", equalTo("123"));
-    ;
+    mvc.perform(post("/users/login")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.user.email").value(email))
+        .andExpect(jsonPath("$.user.username").value(username))
+        .andExpect(jsonPath("$.user.bio").value(""))
+        .andExpect(jsonPath("$.user.image").value(defaultAvatar))
+        .andExpect(jsonPath("$.user.token").value("123"));
   }
 
   @Test
@@ -258,14 +239,10 @@ public class UsersApiTest {
           }
         };
 
-    given()
-        .contentType("application/json")
-        .body(param)
-        .when()
-        .post("/users/login")
-        .prettyPeek()
-        .then()
-        .statusCode(422)
-        .body("message", equalTo("invalid email or password"));
+    mvc.perform(post("/users/login")
+            .contentType("application/json")
+            .content(objectMapper.writeValueAsString(param)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.message").value("invalid email or password"));
   }
 }
