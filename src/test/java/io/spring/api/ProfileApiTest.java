@@ -1,12 +1,16 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.spring.JacksonCustomizations;
 import io.spring.api.security.WebSecurityConfig;
 import io.spring.application.ProfileQueryService;
@@ -36,7 +40,6 @@ public class ProfileApiTest extends TestWithCurrentUser {
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
     anotherUser = new User("username@test.com", "username", "123", "", "");
     profileData =
         new ProfileData(
@@ -53,25 +56,18 @@ public class ProfileApiTest extends TestWithCurrentUser {
   public void should_get_user_profile_success() throws Exception {
     when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(null)))
         .thenReturn(Optional.of(profileData));
-    RestAssuredMockMvc.when()
-        .get("/profiles/{username}", profileData.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200)
-        .body("profile.username", equalTo(profileData.getUsername()));
+    mvc.perform(get("/profiles/{username}", profileData.getUsername()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.profile.username").value(profileData.getUsername()));
   }
 
   @Test
   public void should_follow_user_success() throws Exception {
     when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(user)))
         .thenReturn(Optional.of(profileData));
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .post("/profiles/{username}/follow", anotherUser.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200);
+    mvc.perform(post("/profiles/{username}/follow", anotherUser.getUsername())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isOk());
     verify(userRepository).saveRelation(new FollowRelation(user.getId(), anotherUser.getId()));
   }
 
@@ -83,13 +79,9 @@ public class ProfileApiTest extends TestWithCurrentUser {
     when(profileQueryService.findByUsername(eq(profileData.getUsername()), eq(user)))
         .thenReturn(Optional.of(profileData));
 
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/profiles/{username}/follow", anotherUser.getUsername())
-        .prettyPeek()
-        .then()
-        .statusCode(200);
+    mvc.perform(delete("/profiles/{username}/follow", anotherUser.getUsername())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isOk());
 
     verify(userRepository).removeRelation(eq(followRelation));
   }

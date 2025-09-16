@@ -1,14 +1,18 @@
 package io.spring.api;
 
-import static io.restassured.module.mockmvc.RestAssuredMockMvc.given;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.restassured.module.mockmvc.RestAssuredMockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.spring.JacksonCustomizations;
 import io.spring.TestHelper;
 import io.spring.api.security.WebSecurityConfig;
@@ -45,11 +49,12 @@ public class ArticleApiTest extends TestWithCurrentUser {
 
   @MockBean ArticleCommandService articleCommandService;
 
+  @Autowired private ObjectMapper objectMapper;
+
   @Override
   @BeforeEach
   public void setUp() throws Exception {
     super.setUp();
-    RestAssuredMockMvc.mockMvc(mvc);
   }
 
   @Test
@@ -68,19 +73,17 @@ public class ArticleApiTest extends TestWithCurrentUser {
 
     when(articleQueryService.findBySlug(eq(slug), eq(null))).thenReturn(Optional.of(articleData));
 
-    RestAssuredMockMvc.when()
-        .get("/articles/{slug}", slug)
-        .then()
-        .statusCode(200)
-        .body("article.slug", equalTo(slug))
-        .body("article.body", equalTo(articleData.getBody()))
-        .body("article.createdAt", equalTo(ISODateTimeFormat.dateTime().withZoneUTC().print(time)));
+    mvc.perform(get("/articles/{slug}", slug))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.article.slug").value(slug))
+        .andExpect(jsonPath("$.article.body").value(articleData.getBody()))
+        .andExpect(jsonPath("$.article.createdAt").value(ISODateTimeFormat.dateTime().withZoneUTC().print(time)));
   }
 
   @Test
   public void should_404_if_article_not_found() throws Exception {
     when(articleQueryService.findBySlug(anyString(), any())).thenReturn(Optional.empty());
-    RestAssuredMockMvc.when().get("/articles/not-exists").then().statusCode(404);
+    mvc.perform(get("/articles/not-exists")).andExpect(status().isNotFound());
   }
 
   @Test
@@ -107,15 +110,12 @@ public class ArticleApiTest extends TestWithCurrentUser {
     when(articleQueryService.findBySlug(eq(updatedArticle.getSlug()), eq(user)))
         .thenReturn(Optional.of(updatedArticleData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(updateParam)
-        .when()
-        .put("/articles/{slug}", originalArticle.getSlug())
-        .then()
-        .statusCode(200)
-        .body("article.slug", equalTo(updatedArticleData.getSlug()));
+    mvc.perform(put("/articles/{slug}", originalArticle.getSlug())
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(updateParam)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.article.slug").value(updatedArticleData.getSlug()));
   }
 
   @Test
@@ -155,14 +155,11 @@ public class ArticleApiTest extends TestWithCurrentUser {
     when(articleQueryService.findBySlug(eq(article.getSlug()), eq(user)))
         .thenReturn(Optional.of(articleData));
 
-    given()
-        .contentType("application/json")
-        .header("Authorization", "Token " + token)
-        .body(updateParam)
-        .when()
-        .put("/articles/{slug}", article.getSlug())
-        .then()
-        .statusCode(403);
+    mvc.perform(put("/articles/{slug}", article.getSlug())
+            .contentType("application/json")
+            .header("Authorization", "Token " + token)
+            .content(objectMapper.writeValueAsString(updateParam)))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -175,12 +172,9 @@ public class ArticleApiTest extends TestWithCurrentUser {
         new Article(title, description, body, Arrays.asList("java", "spring", "jpg"), user.getId());
     when(articleRepository.findBySlug(eq(article.getSlug()))).thenReturn(Optional.of(article));
 
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/articles/{slug}", article.getSlug())
-        .then()
-        .statusCode(204);
+    mvc.perform(delete("/articles/{slug}", article.getSlug())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isNoContent());
 
     verify(articleRepository).remove(eq(article));
   }
@@ -198,12 +192,9 @@ public class ArticleApiTest extends TestWithCurrentUser {
             title, description, body, Arrays.asList("java", "spring", "jpg"), anotherUser.getId());
 
     when(articleRepository.findBySlug(eq(article.getSlug()))).thenReturn(Optional.of(article));
-    given()
-        .header("Authorization", "Token " + token)
-        .when()
-        .delete("/articles/{slug}", article.getSlug())
-        .then()
-        .statusCode(403);
+    mvc.perform(delete("/articles/{slug}", article.getSlug())
+            .header("Authorization", "Token " + token))
+        .andExpect(status().isForbidden());
   }
 
   private HashMap<String, Object> prepareUpdateParam(
