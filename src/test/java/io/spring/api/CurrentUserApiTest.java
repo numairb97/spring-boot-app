@@ -140,7 +140,7 @@ public class CurrentUserApiTest extends TestWithCurrentUser {
         .put("/user")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.email[0]", equalTo("email already exist"));
   }
 
