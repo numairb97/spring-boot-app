@@ -54,7 +54,7 @@ public class UsersApiTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    RestAssuredMockMvc.mockMvc(mvc);
+    io.restassured.module.mockmvc.RestAssuredMockMvc.mockMvc(mvc);
     defaultAvatar = "https://static.productionready.io/images/smiley-cyrus.jpg";
   }
 
@@ -106,7 +106,7 @@ public class UsersApiTest {
         .post("/users")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.username[0]", equalTo("can't be empty"));
   }
 
@@ -124,7 +124,7 @@ public class UsersApiTest {
         .post("/users")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.email[0]", equalTo("should be an email"));
   }
 
@@ -146,7 +146,7 @@ public class UsersApiTest {
         .post("/users")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.username[0]", equalTo("duplicated username"));
   }
 
@@ -168,7 +168,7 @@ public class UsersApiTest {
         .when()
         .post("/users")
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.email[0]", equalTo("duplicated email"));
   }
 
@@ -265,7 +265,7 @@ public class UsersApiTest {
         .post("/users/login")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("message", equalTo("invalid email or password"));
   }
 }

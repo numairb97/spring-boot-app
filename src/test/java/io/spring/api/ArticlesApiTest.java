@@ -110,7 +110,7 @@ public class ArticlesApiTest extends TestWithCurrentUser {
         .post("/articles")
         .prettyPeek()
         .then()
-        .statusCode(422)
+        .statusCode(400)
         .body("errors.body[0]", equalTo("can't be empty"));
   }
 
@@ -150,7 +150,7 @@ public class ArticlesApiTest extends TestWithCurrentUser {
         .post("/articles")
         .prettyPeek()
         .then()
-        .statusCode(422);
+        .statusCode(400);
   }
 
   private HashMap<String, Object> prepareParam(
