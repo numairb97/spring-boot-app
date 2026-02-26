@@ -3,6 +3,7 @@ package io.spring.infrastructure.service;
 import io.spring.core.service.JwtService;
 import io.spring.core.user.User;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,8 @@ public class DefaultJwtServiceTest {
 
   @BeforeEach
   public void setUp() {
-    jwtService = new DefaultJwtService("123123123123123123123123123123123123123123123123123123123123", 3600);
+    String secret = UUID.randomUUID().toString().repeat(4);
+    jwtService = new DefaultJwtService(secret, 3600);
   }
 
   @Test
